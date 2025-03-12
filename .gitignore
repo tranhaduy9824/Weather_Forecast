@@ -1,1 +1,4 @@
 /backend/dataset
+/backend/logs
+/backend/model/checkpoints
+

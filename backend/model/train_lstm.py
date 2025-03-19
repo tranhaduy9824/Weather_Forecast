@@ -99,21 +99,47 @@ else:
     model = Sequential([
         Input(shape=(timesteps, len(feature_cols))),
         LSTM(128, return_sequences=True),
+        # BatchNormalization(),
         Dropout(0.2),
         LSTM(64, return_sequences=False),
+        # BatchNormalization(),
         Dropout(0.2),
         Dense(24 * len(target_cols)),  
         tf.keras.layers.Reshape((24, len(target_cols)))
     ])
     model.compile(optimizer='adam', loss='mse', metrics=['mae'])
 
-best_checkpoint = ModelCheckpoint(
-    filepath=os.path.join(checkpoint_dir, "best_model.h5"),
-    save_best_only=True,
-    monitor="val_loss",
-    mode="min",
-    verbose=1
-)
+class CustomCheckpoint(tf.keras.callbacks.Callback):
+    def __init__(self, best_model_path):
+        super(CustomCheckpoint, self).__init__()
+        self.best_model_path = best_model_path
+        self.best_loss = float("inf")
+        self.best_mae = float("inf")
+
+    def on_epoch_end(self, epoch, logs=None):
+        val_loss = logs.get("val_loss")
+        val_mae = logs.get("val_mae")
+
+        if val_loss < self.best_loss:
+            self.best_loss = val_loss
+            self.best_mae = val_mae
+            self.model.save(self.best_model_path)
+            print(f"✅ Lưu mô hình tốt nhất (val_loss={val_loss:.6f}, val_mae={val_mae:.6f})")
+        
+        elif val_loss == self.best_loss and val_mae < self.best_mae:
+            self.best_mae = val_mae
+            self.model.save(self.best_model_path)
+            print(f"✅ Lưu mô hình tốt nhất do val_mae giảm (val_loss={val_loss:.6f}, val_mae={val_mae:.6f})")
+
+# best_checkpoint = ModelCheckpoint(
+#     filepath=os.path.join(checkpoint_dir, "best_model.h5"),
+#     save_best_only=True,
+#     monitor="val_loss",
+#     mode="min",
+#     verbose=1
+# )
+
+best_checkpoint = CustomCheckpoint(os.path.join(checkpoint_dir, "best_model.h5"))
 
 latest_checkpoint = ModelCheckpoint(
     filepath=latest_checkpoint_path,
@@ -134,7 +160,7 @@ epoch_tracker = EpochTracker(epoch_tracker_file)
 early_stopping = EarlyStopping(monitor='val_loss', patience=5, restore_best_weights=True)
 reduce_lr = ReduceLROnPlateau(monitor='val_loss', factor=0.5, patience=3, min_lr=1e-6)
 
-istory = model.fit(
+history = model.fit(
     train_dataset,
     epochs=50,
     initial_epoch=initial_epoch,

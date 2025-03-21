@@ -1,9 +1,4 @@
 /backend/dataset
 /backend/logs
-/backend/model/checkpoints
-/backend/model/checkpoints2
-/backend/model/checkpoints3
 /backend/model/old
-/backend/model/best_model.h5
-/backend/model/best_model2.h5
 

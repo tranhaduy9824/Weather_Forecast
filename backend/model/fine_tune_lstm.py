@@ -15,7 +15,7 @@ print("🖥️ Các thiết bị khả dụng:", tf.config.list_physical_devices
 train_file = "backend/dataset/processed/train_data.csv"
 test_file = "backend/dataset/processed/test_data.csv"
 scaler_file = "backend/dataset/processed/scaler.pkl"
-checkpoint_dir = "backend/model/checkpoints/"
+checkpoint_dir = "backend/model/checkpoints_fine_tune/"
 fine_tuned_model_file = "backend/model/cnn_lstm_weather.h5"
 best_model_file = os.path.join(checkpoint_dir, "best_model_spatial.h5")
 epoch_file = os.path.join(checkpoint_dir, "last_epoch.txt")
@@ -182,5 +182,5 @@ except KeyboardInterrupt:
     print(f"✅ Đã lưu epoch gần nhất ({current_epoch}) vào {epoch_file} và mô hình vào {best_model_file}")
     exit(0)
 
-cnn_lstm_model.save("backend/model/checkpoints/best_model_spatial.h5")
+cnn_lstm_model.save("backend/model/checkpoints_fine_tune/best_model_spatial.h5")
 print("✅ Mô hình CNN-LSTM đã được fine-tune và lưu lại.")

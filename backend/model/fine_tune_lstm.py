@@ -32,9 +32,11 @@ dtype_dict.update({"hour": np.int8, "day": np.int8, "month": np.int8, "season": 
 with open(scaler_file, 'rb') as f:
     scaler_X, scaler_y = pickle.load(f)
 
-best_model_path = os.path.join(checkpoint_dir, "best_model.h5")
-print(f"🔄 Đang tải model từ: {best_model_path}")
-old_model = load_model(best_model_path)
+if os.path.exists(best_model_file):
+    print(f"🔄 Đang tải mô hình từ: {best_model_file}")
+    old_model = load_model(best_model_file)
+else:
+    print("❌ Không tìm thấy mô hình trước đó, sẽ huấn luyện lại từ đầu.")
 
 latitudes = np.arange(8, 25, 1) 
 longitudes = np.arange(102, 119, 1) 
@@ -71,6 +73,14 @@ timesteps = 24
 
 train_dataset_multi = tf.data.Dataset.from_generator(
     lambda: data_generator_multi(train_file, feature_cols, target_cols, batch_size, timesteps),
+    output_signature=(
+        tf.TensorSpec(shape=(None, timesteps, len(feature_cols)), dtype=tf.float32),
+        tf.TensorSpec(shape=(None, 24, len(target_cols)), dtype=tf.float32),
+    )
+).prefetch(tf.data.AUTOTUNE)
+
+test_dataset_multi = tf.data.Dataset.from_generator(
+    lambda: data_generator_multi(test_file, feature_cols, target_cols, batch_size, timesteps),
     output_signature=(
         tf.TensorSpec(shape=(None, timesteps, len(feature_cols)), dtype=tf.float32),
         tf.TensorSpec(shape=(None, 24, len(target_cols)), dtype=tf.float32),
@@ -115,7 +125,7 @@ try:
         train_dataset_multi,
         epochs=10,
         initial_epoch=start_epoch,
-        validation_data=train_dataset_multi,
+        validation_data=test_dataset_multi,
         callbacks=[
             EarlyStopping(monitor='val_loss', patience=5, restore_best_weights=True),
             ReduceLROnPlateau(monitor='val_loss', factor=0.5, patience=3, min_lr=1e-6),
@@ -150,7 +160,7 @@ cnn_lstm_model = Sequential([
     Dropout(0.2),
 
     Dense(24 * len(target_cols)),
-    tf.keras.layers.Reshape((24, len(target_cols))) 
+    tf.keras.layers.Reshape((24, len(target_cols)))
 ])
 
 cnn_lstm_model.compile(optimizer='adam', loss='mse', metrics=['mae'])
@@ -163,7 +173,7 @@ try:
         train_dataset_multi,
         epochs=10,
         initial_epoch=start_epoch,
-        validation_data=train_dataset_multi,
+        validation_data=test_dataset_multi,
         callbacks=[
             EarlyStopping(monitor='val_loss', patience=5, restore_best_weights=True),
             ReduceLROnPlateau(monitor='val_loss', factor=0.5, patience=3, min_lr=1e-6),

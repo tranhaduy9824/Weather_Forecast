@@ -1,4 +1,4 @@
 /backend/dataset
 /backend/logs
 /backend/model/old
-
+/backend/model/test_subset_20_percent.csv

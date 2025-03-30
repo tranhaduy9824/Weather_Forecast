@@ -146,7 +146,6 @@ latest_checkpoint = ModelCheckpoint(
     save_best_only=False,
     verbose=0
 )
-
 class EpochTracker(tf.keras.callbacks.Callback):
     def __init__(self, epoch_file):
         self.epoch_file = epoch_file

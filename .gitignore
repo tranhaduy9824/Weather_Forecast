@@ -1,4 +1,6 @@
-/backend/dataset
+/backend/dataset/processed
+/backend/dataset/weather_chunks
+/backend/dataset/vietnam_weather_hourly.csv
 /backend/logs
 /backend/model/old
 /backend/model/test_subset_20_percent.csv

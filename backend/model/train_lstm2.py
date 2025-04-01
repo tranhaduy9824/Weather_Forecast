@@ -5,7 +5,7 @@ import pickle
 import os
 import gc
 from tensorflow.keras.models import Sequential, load_model
-from tensorflow.keras.layers import ConvLSTM2D, Dense, Dropout, Input, BatchNormalization
+from tensorflow.keras.layers import LSTM, Dense, Dropout, Input, BatchNormalization
 from tensorflow.keras.callbacks import ModelCheckpoint, EarlyStopping, ReduceLROnPlateau
 from sklearn.preprocessing import MinMaxScaler
 
@@ -16,7 +16,7 @@ train_file = "backend/dataset/processed/train_data2.csv"
 test_file = "backend/dataset/processed/test_data2.csv"
 scaler_file = "backend/dataset/processed/scaler_new.pkl"
 checkpoint_dir = "backend/model/checkpoints_new/"
-model_file = "backend/model/conv_lstm_weather.h5"
+model_file = "backend/model/lstm_weather.h5"
 
 os.makedirs(checkpoint_dir, exist_ok=True)
 
@@ -31,7 +31,7 @@ dtype_dict.update({"hour": np.int8, "day": np.int8, "month": np.int8, "season": 
 # Khởi tạo scaler
 scaler_X = MinMaxScaler()
 scaler_y = MinMaxScaler()
-chunk_size = 50000
+chunk_size = 5000
 
 print("⚡ Bắt đầu chuẩn hóa dữ liệu toàn bộ...")
 for chunk in pd.read_csv(train_file, chunksize=chunk_size, usecols=feature_cols + target_cols, dtype=dtype_dict):
@@ -45,7 +45,7 @@ del chunk
 gc.collect()
 print("✅ Hoàn tất chuẩn hóa!")
 
-# Data generator
+# Data generator cho LSTM
 def data_generator(file_path, feature_cols, target_cols, batch_size=256, timesteps=24):
     for chunk in pd.read_csv(file_path, chunksize=batch_size * 10, dtype=dtype_dict, parse_dates=["Datetime"]):
         chunk = chunk.sort_values(by=["Datetime"])
@@ -57,11 +57,11 @@ def data_generator(file_path, feature_cols, target_cols, batch_size=256, timeste
         if num_samples <= 0:
             continue
 
-        X_batch = np.zeros((num_samples, timesteps, 1, 1, len(feature_cols)), dtype=np.float32)  # Chỉnh lại grid thành 1x1
+        X_batch = np.zeros((num_samples, timesteps, len(feature_cols)), dtype=np.float32)
         y_batch = np.zeros((num_samples, 24, len(target_cols)), dtype=np.float32)
 
         for i in range(num_samples):
-            X_batch[i] = X_scaled[i:i+timesteps].reshape((timesteps, 1, 1, len(feature_cols)))
+            X_batch[i] = X_scaled[i:i+timesteps]
             y_batch[i] = y_scaled[i+timesteps:i+timesteps+24]
 
         for start in range(0, num_samples, batch_size):
@@ -69,14 +69,14 @@ def data_generator(file_path, feature_cols, target_cols, batch_size=256, timeste
             yield X_batch[start:end], y_batch[start:end]
 
 # Cấu hình
-batch_size = 256
+batch_size = 128
 timesteps = 24
 
 # Dataset
 train_dataset = tf.data.Dataset.from_generator(
     lambda: data_generator(train_file, feature_cols, target_cols, batch_size, timesteps),
     output_signature=(
-        tf.TensorSpec(shape=(None, timesteps, 1, 1, len(feature_cols)), dtype=tf.float32),
+        tf.TensorSpec(shape=(None, timesteps, len(feature_cols)), dtype=tf.float32),
         tf.TensorSpec(shape=(None, 24, len(target_cols)), dtype=tf.float32),
     )
 ).cache().prefetch(tf.data.AUTOTUNE)
@@ -84,7 +84,7 @@ train_dataset = tf.data.Dataset.from_generator(
 test_dataset = tf.data.Dataset.from_generator(
     lambda: data_generator(test_file, feature_cols, target_cols, batch_size, timesteps),
     output_signature=(
-        tf.TensorSpec(shape=(None, timesteps, 1, 1, len(feature_cols)), dtype=tf.float32),
+        tf.TensorSpec(shape=(None, timesteps, len(feature_cols)), dtype=tf.float32),
         tf.TensorSpec(shape=(None, 24, len(target_cols)), dtype=tf.float32),
     )
 ).cache().prefetch(tf.data.AUTOTUNE)
@@ -101,19 +101,21 @@ else:
     print("🚀 Khởi tạo model mới...")
     initial_epoch = 0
     model = Sequential([
-        Input(shape=(timesteps, 1, 1, len(feature_cols))),  # Grid 1x1 thay vì 3x3
-        ConvLSTM2D(filters=64, kernel_size=(1, 1), padding='same', activation='relu', return_sequences=True),
+        Input(shape=(timesteps, len(feature_cols))),
+        LSTM(128, return_sequences=True),
         BatchNormalization(),
         Dropout(0.3),
-        ConvLSTM2D(filters=32, kernel_size=(1, 1), padding='same', activation='relu', return_sequences=False),
+        LSTM(64, return_sequences=False),
         BatchNormalization(),
         Dropout(0.3),
         Dense(128, activation='relu'),
         Dropout(0.2),
-        Dense(24 * len(target_cols)),  # Tổng số phần tử = 24 * 6 = 144
+        Dense(24 * len(target_cols)),
         tf.keras.layers.Reshape((24, len(target_cols)))
     ])
-    model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=0.001), loss='mse', metrics=['mae'])
+    model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=0.001), 
+                loss='mse', 
+                metrics=['mae'])
 
 # Callbacks
 class CustomCheckpoint(tf.keras.callbacks.Callback):
@@ -145,10 +147,6 @@ class EpochTracker(tf.keras.callbacks.Callback):
 
 epoch_tracker = EpochTracker(epoch_tracker_file)
 
-# Mixed precision
-policy = tf.keras.mixed_precision.Policy('mixed_float16')
-tf.keras.mixed_precision.set_global_policy(policy)
-
 # Huấn luyện
 history = model.fit(
     train_dataset,
@@ -161,4 +159,4 @@ history = model.fit(
 
 # Lưu mô hình
 model.save(model_file, save_format="h5")
-print("✅ Mô hình đã được huấn luyện và lưu lại.")
+print("✅ Mô hình LSTM đã được huấn luyện và lưu lại.")

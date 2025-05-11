@@ -1,0 +1,16 @@
+Kết quả sai số của mô hình LSTM:
+       Biến      MAE     RMSE
+         PS 0.283758 0.362890
+        T2M 3.166507 4.165608
+       QV2M 1.612713 2.022876
+      WS10M 1.502101 1.844372
+PRECTOTCORR 3.695023 5.345674
+
+Kết quả sai số của Baseline (Trung bình lịch sử):
+             Biến  MAE (Baseline)  RMSE (Baseline)
+CLRSKY_SFC_SW_DWN        0.000000         0.000000
+               PS        0.181824         0.229833
+              T2M        2.775708         3.144355
+             QV2M        1.108052         1.380183
+            WS10M        1.146545         1.409984
+      PRECTOTCORR        2.038976         4.884220
